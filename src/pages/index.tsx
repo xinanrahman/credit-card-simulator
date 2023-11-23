@@ -31,7 +31,6 @@ export default function Home() {
             ? data.payableBalance
             : "Loading payable balance..."}
         </p>
-        x
       </div>
     </>
   );
