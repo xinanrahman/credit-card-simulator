@@ -21,16 +21,17 @@ export default function Home() {
         </p>
         <p className="text-2xl text-foreground">
           Available Balance:{" "}
-          {data?.availableBalance
+          {data?.availableBalance !== undefined
             ? data.availableBalance
             : "Loading available balance..."}
         </p>
         <p className="text-2xl text-foreground">
           Payable Balance:{" "}
-          {data?.payableBalance
+          {data?.payableBalance !== undefined
             ? data.payableBalance
             : "Loading payable balance..."}
         </p>
+        x
       </div>
     </>
   );
