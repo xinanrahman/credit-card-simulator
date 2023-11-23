@@ -28,7 +28,7 @@ export default function Home() {
         <p className="text-2xl text-foreground">
           Payable Balance:{" "}
           {data?.payableBalance
-            ? data.availableBalance
+            ? data.payableBalance
             : "Loading payable balance..."}
         </p>
       </div>
