@@ -11,6 +11,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model Balance {
+    id String @id
+    availableBalance Float @default(1000.0)
+    payableBalance Float @default(0.0)
+    transactions Transaction[] 
+}
 model Transaction {
     id Int @id @default(autoincrement())
     userId String
@@ -19,6 +25,9 @@ model Transaction {
     settledAt DateTime? 
     status TransactionStatus @default(PENDING)
     type TransactionType
+
+    balance Balance @relation(fields: [userId], references: [id])
+    @@index([userId])
 }
 
 enum TransactionStatus {
