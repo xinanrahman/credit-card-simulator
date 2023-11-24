@@ -3,7 +3,11 @@ import { InitiateTransactionInput } from "prisma/zodSchemas/schemas";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { InsufficientBalanceError, getVerifiedBalance } from "~/server/utils";
+import {
+  InsufficientBalanceError,
+  getPendingTransactions,
+  getVerifiedBalance,
+} from "~/server/utils";
 
 export const cardActionsRouter = createTRPCRouter({
   hello: protectedProcedure
@@ -44,19 +48,8 @@ export const cardActionsRouter = createTRPCRouter({
       }
 
       // Get updated pending transactions
-      let updatedPendingTransactions: Transaction[];
-      try {
-        updatedPendingTransactions = await ctx.db.transaction.findMany({
-          where: {
-            userId: userId,
-            status: "PENDING",
-          },
-        });
-      } catch (error) {
-        throw new Error(
-          "Error retrieving pending transactions while interacting with database",
-        );
-      }
+      const updatedPendingTransactions: Transaction[] =
+        await getPendingTransactions(userId);
 
       // Get verified balance; create balance if it does not exist
       let balance: Balance;
@@ -75,7 +68,7 @@ export const cardActionsRouter = createTRPCRouter({
         }
       }
 
-      // Update available balance
+      // Decrement available balance by transaction amount
       let updatedBalance: Balance;
       try {
         updatedBalance = await ctx.db.balance.update({
@@ -83,7 +76,7 @@ export const cardActionsRouter = createTRPCRouter({
             id: userId,
           },
           data: {
-            availableBalance: balance.availableBalance - input.amount,
+            availableBalance: { decrement: input.amount },
           },
         });
       } catch (error) {
@@ -103,22 +96,64 @@ export const cardActionsRouter = createTRPCRouter({
       // TODO create pending payment in database using Prisma
     }),
   clearTransaction: protectedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      // TODO cancel pending transaction in database using Prisma
+      const userId = ctx.auth.userId;
+      if (!userId) {
+        throw new Error("User is not authenticated");
+      }
+
+      // Sequentially clear pending transaction and increment available balance
+      const cleared = await ctx.db.$transaction(async () => {
+        // Remove pending transaction from database
+        const clearedTransaction: Pick<Transaction, "amount"> =
+          await ctx.db.transaction.delete({
+            where: {
+              id: input.id,
+            },
+            select: {
+              amount: true,
+            },
+          });
+
+        // Get updated pending transactions
+        const updatedPendingTransactions: Transaction[] =
+          await getPendingTransactions(userId);
+
+        // Increment available balance
+        const updatedBalance: Balance = await ctx.db.balance.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            availableBalance: {
+              increment: clearedTransaction.amount,
+            },
+          },
+        });
+        return {
+          pendingTransactions: updatedPendingTransactions,
+          availableBalance: updatedBalance.availableBalance,
+        };
+      });
+
+      return {
+        pendingTransactions: cleared.pendingTransactions,
+        availableBalance: cleared.availableBalance,
+      };
     }),
   cancelPayment: protectedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       // TODO cancel pending payment in database using Prisma
     }),
   settleTransaction: protectedProcedure
-    .input(z.object({ id: z.string(), finalAmount: z.number() }))
+    .input(z.object({ id: z.number(), finalAmount: z.number() }))
     .mutation(async ({ ctx, input }) => {
       // TODO settle pending transaction in database using Prisma
     }),
   postPayment: protectedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       // TODO post pending payment in database using Prisma
     }),

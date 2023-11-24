@@ -1,5 +1,4 @@
-import { Balance } from "@prisma/client";
-import { z } from "zod";
+import type { Balance } from "@prisma/client";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getVerifiedBalance } from "~/server/utils";
@@ -11,14 +10,7 @@ export const cardViewsRouter = createTRPCRouter({
       throw new Error("User is not authenticated");
     }
 
-    let balance: Balance;
-    try {
-      balance = await getVerifiedBalance(userId);
-    } catch (error) {
-      throw new Error(
-        "Error retrieving balance while interacting with database",
-      );
-    }
+    const balance: Balance = await getVerifiedBalance(userId);
 
     return {
       availableBalance: balance.availableBalance,
