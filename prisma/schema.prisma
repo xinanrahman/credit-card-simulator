@@ -21,6 +21,7 @@ model Transaction {
     id Int @id @default(autoincrement())
     userId String
     name String @default("Untitled Transaction")
+    amount Float 
     createdAt DateTime @default(now())
     settledAt DateTime? 
     status TransactionStatus @default(PENDING)
