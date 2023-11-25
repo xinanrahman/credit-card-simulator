@@ -1,17 +1,20 @@
 import {
-  TransactionStatus,
   type Balance,
   type Transaction,
+  TransactionType,
 } from "@prisma/client";
 import { InitiateTransactionInput } from "prisma/zodSchemas/schemas";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
+  ExcessPaymentError,
   InsufficientBalanceError,
+  createTransaction,
   deletePendingTransaction,
   getPendingTransactions,
   getVerifiedBalance,
+  updateSettledTransaction,
 } from "~/server/utils";
 
 export const cardActionsRouter = createTRPCRouter({
@@ -35,22 +38,12 @@ export const cardActionsRouter = createTRPCRouter({
 
       // Create pending transaction
       // Note: keep below structure in case we want to return transaction in the future
-      let transaction: Transaction;
-      try {
-        transaction = await ctx.db.transaction.create({
-          data: {
-            userId: userId,
-            name: input.name ?? "Untitled Transaction",
-            amount: input.amount,
-            status: "PENDING",
-            type: "PURCHASE",
-          },
-        });
-      } catch (error) {
-        throw new Error(
-          "Error creating transaction while interacting with database",
-        );
-      }
+      const transaction: Transaction = await createTransaction(
+        userId,
+        TransactionType.PURCHASE,
+        input.amount,
+        input.name,
+      );
 
       // Get updated pending transactions
       const updatedPendingTransactions: Transaction[] =
@@ -95,10 +88,69 @@ export const cardActionsRouter = createTRPCRouter({
         availableBalance: updatedBalance.availableBalance,
       };
     }),
+  // Note: payments are displayed as negative values, thus stored as negative numbers
   initiatePayment: protectedProcedure
     .input(InitiateTransactionInput)
     .mutation(async ({ ctx, input }) => {
-      // TODO create pending payment in database using Prisma
+      const userId = ctx.auth.userId;
+      if (!userId) {
+        throw new Error("User is not authenticated");
+      }
+
+      // Create pending transaction
+      // Note: keep below structure in case we want to return transaction in the future
+      const transaction: Transaction = await createTransaction(
+        userId,
+        TransactionType.PAYMENT,
+        -input.amount,
+        input.name,
+      );
+
+      // Get updated pending transactions
+      const updatedPendingTransactions: Transaction[] =
+        await getPendingTransactions(userId);
+
+      // Get verified payable balance and handle invalid inputs
+      let balance: Balance;
+      const payment = true;
+      try {
+        balance = await getVerifiedBalance(userId, payment);
+        if (balance.payableBalance < input.amount) {
+          throw new ExcessPaymentError(
+            "Attempted payment amount exceeds payable balance",
+          );
+        }
+      } catch (error) {
+        if (error instanceof Error) {
+          throw error;
+        } else {
+          throw new Error(
+            "Error initiating payment while interacting with database",
+          );
+        }
+      }
+
+      // Decrement payable balance
+      let updatedBalance: Balance;
+      try {
+        updatedBalance = await ctx.db.balance.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            // Note: decrementing as user input is positive (internally, we do end up storing as negative as seen above)
+            payableBalance: { decrement: input.amount },
+          },
+        });
+      } catch (error) {
+        throw new Error(
+          "Error updating available balance while interacting with database",
+        );
+      }
+      return {
+        pendingTransactions: updatedPendingTransactions,
+        payableBalance: updatedBalance.payableBalance,
+      };
     }),
   clearTransaction: protectedProcedure
     .input(z.object({ id: z.number() }))
@@ -142,36 +194,73 @@ export const cardActionsRouter = createTRPCRouter({
   cancelPayment: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      // TODO cancel pending payment in database using Prisma
+      const userId = ctx.auth.userId;
+      if (!userId) {
+        throw new Error("User is not authenticated");
+      }
+
+      // Sequentially clear pending transaction and increment available balance
+      // TODO: Create utility function for canceling transactions
+      const canceled = await ctx.db.$transaction(async () => {
+        // Remove pending transaction from database
+        const canceledTransaction = await deletePendingTransaction(input.id);
+
+        // Get updated pending transactions
+        const updatedPendingTransactions: Transaction[] =
+          await getPendingTransactions(userId);
+
+        // Decrement payable balance
+        const updatedBalance: Balance = await ctx.db.balance.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            payableBalance: {
+              // Note: intuitively, we may want to "increment"
+              // however, to incremenet, we "decrement" as payments are represented internally with negative values :)
+              decrement: canceledTransaction.amount,
+            },
+          },
+        });
+        return {
+          pendingTransactions: updatedPendingTransactions,
+          payableBalance: updatedBalance.payableBalance,
+        };
+      });
+
+      return {
+        pendingTransactions: canceled.pendingTransactions,
+        payableBalance: canceled.payableBalance,
+      };
     }),
   settleTransaction: protectedProcedure
-    .input(z.object({ id: z.number(), finalAmount: z.number() }))
+    .input(
+      z.object({
+        id: z.number(),
+        finalAmount: z
+          .number()
+          .positive("Final transaction amount must be greater than zero"),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.auth.userId;
       if (!userId) {
         throw new Error("User is not authenticated");
       }
 
+      if (input.finalAmount <= 0) {
+        throw new Error(
+          "Cannot process settlement: finalAmount less than or equal to zero",
+        );
+      }
+
       // Settle transaction and update balances sequentially
       const settled = await ctx.db.$transaction(async () => {
         // Change transaction status to settled and return amount
-        const settledTransaction = await ctx.db.transaction.update({
-          where: {
-            id: input.id,
-            status: TransactionStatus.PENDING,
-          },
-          data: {
-            status: TransactionStatus.SETTLED,
-          },
-          select: {
-            amount: true,
-          },
-        });
-
-        // Check if the transaction was found and updated
-        if (!settledTransaction) {
-          throw new Error(`Transaction with ID ${input.id} not found`);
-        }
+        const settledTransaction = await updateSettledTransaction(
+          input.id,
+          input.finalAmount,
+        );
 
         // Get updated pending transactions
         const updatedPendingTransactions: Transaction[] =
@@ -209,6 +298,42 @@ export const cardActionsRouter = createTRPCRouter({
   postPayment: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      // TODO post pending payment in database using Prisma
+      const userId = ctx.auth.userId;
+      if (!userId) {
+        throw new Error("User is not authenticated");
+      }
+
+      // Post payment and update balances sequentially
+      const posted = await ctx.db.$transaction(async () => {
+        // Change transaction status to settled and return amount
+        const postedTransaction = await updateSettledTransaction(input.id);
+
+        // Get updated pending transactions
+        const updatedPendingTransactions: Transaction[] =
+          await getPendingTransactions(userId);
+
+        // Increment available balance through "decrement" (since pending payment amount internally is negative)
+        const updatedBalance: Balance = await ctx.db.balance.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            availableBalance: {
+              decrement: postedTransaction.amount,
+            },
+          },
+        });
+
+        return {
+          pendingTransactions: updatedPendingTransactions,
+          availableBalance: updatedBalance.availableBalance,
+          payableBalance: updatedBalance.payableBalance,
+        };
+      });
+      return {
+        pendingTransactions: posted.pendingTransactions,
+        availableBalance: posted.availableBalance,
+        payableBalance: posted.payableBalance,
+      };
     }),
 });

@@ -1,9 +1,17 @@
-import type { Balance, Transaction } from "@prisma/client";
+import {
+  TransactionStatus,
+  type Balance,
+  type Transaction,
+  type TransactionType,
+} from "@prisma/client";
 import { db } from "./db";
 
 // Utility function to get the balance for a user
-// If the balance does not exist, create one
-export const getVerifiedBalance = async (userId: string): Promise<Balance> => {
+// Creates a balance if it doesn't exist and a payment is not being attempted
+export const getVerifiedBalance = async (
+  userId: string,
+  payment = false,
+): Promise<Balance> => {
   let balance: Balance | null;
   try {
     balance = await db.balance.findUnique({
@@ -12,17 +20,59 @@ export const getVerifiedBalance = async (userId: string): Promise<Balance> => {
       },
     });
     if (!balance) {
+      // Handle invalid payment attempts
+      if (payment)
+        throw new Error(
+          "Cannot process payment: balance record does not exist",
+        );
+      // Create balance if it doesn't exist and payment is not being initiated
       balance = await db.balance.create({
         data: {
           id: userId,
         },
       });
     }
+    if (payment && balance?.payableBalance)
+      throw new Error("Cannot process payment: payable balance is zero");
   } catch (error) {
+    // Throw expected errors from try block
+    if (error instanceof Error) throw error;
     throw new Error("Error retrieving balance while interacting with database");
   }
 
   return balance;
+};
+
+// Utility function to create a transaction for either a payment or purchase (authorization)
+export const createTransaction = async (
+  userId: string,
+  type: TransactionType,
+  amount: number,
+  name = "Untitled Transaction",
+): Promise<Transaction> => {
+  let transaction: Transaction;
+  try {
+    transaction = await db.transaction.create({
+      data: {
+        userId,
+        name,
+        amount,
+        status: TransactionStatus.PENDING,
+        type,
+      },
+    });
+    if (!transaction) {
+      throw new Error(`Error creating transaction: transaction not found`);
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(
+      "Unexpected error creating transaction while interacting with database",
+    );
+  }
+  return transaction;
 };
 
 export const getPendingTransactions = async (
@@ -62,9 +112,53 @@ export const deletePendingTransaction = async (transactionId: number) => {
   return pendingTransaction;
 };
 
+export const updateSettledTransaction = async (
+  transactionId: number,
+  finalAmount?: number,
+) => {
+  let settled: Pick<Transaction, "amount">;
+  try {
+    // Include final amount if passed in (for transaction settlements)
+    const updateData: { status: TransactionStatus; amount?: number } = {
+      status: TransactionStatus.SETTLED,
+    };
+    if (finalAmount) {
+      updateData.amount = finalAmount;
+    }
+
+    settled = await db.transaction.update({
+      where: {
+        id: transactionId,
+        status: TransactionStatus.PENDING,
+      },
+      data: updateData,
+      select: {
+        amount: true,
+      },
+    });
+
+    if (!settled) {
+      throw new Error(`Transaction with ID ${transactionId} not found`);
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("Error updating settled transaction in database");
+  }
+  return settled;
+};
+
 export class InsufficientBalanceError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "InsufficientBalanceError";
+  }
+}
+
+export class ExcessPaymentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ExcessPaymentError";
   }
 }
