@@ -1,4 +1,8 @@
-import type { Balance, Transaction } from "@prisma/client";
+import {
+  TransactionStatus,
+  type Balance,
+  type Transaction,
+} from "@prisma/client";
 import { InitiateTransactionInput } from "prisma/zodSchemas/schemas";
 import { z } from "zod";
 
@@ -150,8 +154,23 @@ export const cardActionsRouter = createTRPCRouter({
 
       // Settle transaction and update balances sequentially
       const settled = await ctx.db.$transaction(async () => {
-        // Delete pending transaction and retrieve pending amount
-        const settledTransaction = await deletePendingTransaction(input.id);
+        // Change transaction status to settled and return amount
+        const settledTransaction = await ctx.db.transaction.update({
+          where: {
+            id: input.id,
+          },
+          data: {
+            status: TransactionStatus.SETTLED,
+          },
+          select: {
+            amount: true,
+          },
+        });
+
+        // Check if the transaction was found and updated
+        if (!settledTransaction) {
+          throw new Error(`Transaction with ID ${input.id} not found`);
+        }
 
         // Get updated pending transactions
         const updatedPendingTransactions: Transaction[] =
