@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   InsufficientBalanceError,
+  deletePendingTransaction,
   getPendingTransactions,
   getVerifiedBalance,
 } from "~/server/utils";
@@ -106,15 +107,7 @@ export const cardActionsRouter = createTRPCRouter({
       // Sequentially clear pending transaction and increment available balance
       const cleared = await ctx.db.$transaction(async () => {
         // Remove pending transaction from database
-        const clearedTransaction: Pick<Transaction, "amount"> =
-          await ctx.db.transaction.delete({
-            where: {
-              id: input.id,
-            },
-            select: {
-              amount: true,
-            },
-          });
+        const clearedTransaction = await deletePendingTransaction(input.id);
 
         // Get updated pending transactions
         const updatedPendingTransactions: Transaction[] =
@@ -150,7 +143,48 @@ export const cardActionsRouter = createTRPCRouter({
   settleTransaction: protectedProcedure
     .input(z.object({ id: z.number(), finalAmount: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      // TODO settle pending transaction in database using Prisma
+      const userId = ctx.auth.userId;
+      if (!userId) {
+        throw new Error("User is not authenticated");
+      }
+
+      // Settle transaction and update balances sequentially
+      const settled = await ctx.db.$transaction(async () => {
+        // Delete pending transaction and retrieve pending amount
+        const settledTransaction = await deletePendingTransaction(input.id);
+
+        // Get updated pending transactions
+        const updatedPendingTransactions: Transaction[] =
+          await getPendingTransactions(userId);
+
+        // Decrement available balance and increment payable balance
+        const diff = input.finalAmount - settledTransaction.amount;
+        const updatedBalance: Balance = await ctx.db.balance.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            availableBalance: {
+              decrement: diff,
+            },
+            payableBalance: {
+              increment: input.finalAmount,
+            },
+          },
+        });
+
+        return {
+          pendingTransactions: updatedPendingTransactions,
+          availableBalance: updatedBalance.availableBalance,
+          payableBalance: updatedBalance.payableBalance,
+        };
+      });
+
+      return {
+        pendingTransactions: settled.pendingTransactions,
+        availableBalance: settled.availableBalance,
+        payableBalance: settled.payableBalance,
+      };
     }),
   postPayment: protectedProcedure
     .input(z.object({ id: z.number() }))

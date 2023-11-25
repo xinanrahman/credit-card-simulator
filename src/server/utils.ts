@@ -44,6 +44,24 @@ export const getPendingTransactions = async (
   return updatedPendingTransactions;
 };
 
+export const deletePendingTransaction = async (transactionId: number) => {
+  // Delete pending transaction and retrieve pending amount
+  let pendingTransaction: Pick<Transaction, "amount">;
+  try {
+    pendingTransaction = await db.transaction.delete({
+      where: {
+        id: transactionId,
+      },
+      select: {
+        amount: true,
+      },
+    });
+  } catch (error) {
+    throw new Error("Error retrieving and deleting pending transaction");
+  }
+  return pendingTransaction;
+};
+
 export class InsufficientBalanceError extends Error {
   constructor(message: string) {
     super(message);
