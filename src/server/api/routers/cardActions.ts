@@ -158,6 +158,7 @@ export const cardActionsRouter = createTRPCRouter({
         const settledTransaction = await ctx.db.transaction.update({
           where: {
             id: input.id,
+            status: TransactionStatus.PENDING,
           },
           data: {
             status: TransactionStatus.SETTLED,
