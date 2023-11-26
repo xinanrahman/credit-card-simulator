@@ -1,8 +1,13 @@
-import { Button } from "@/components/Button";
 import { UserButton } from "@clerk/nextjs";
 import Head from "next/head";
+import { Button } from "@nextui-org/react";
 
 import { api } from "~/utils/api";
+import AvailableBalance from "~/components/AvailableBalance";
+import PayableBalance from "~/components/PayableBalance";
+import PendingTransactions from "~/components/PendingTransactions";
+import SettledTransactions from "~/components/SettledTransactions";
+import NavBar from "~/components/ui/NavBar";
 
 export default function Home() {
   const hello = api.cardActions?.hello.useQuery({ text: "from tRPC" });
@@ -65,39 +70,23 @@ export default function Home() {
         <meta name="description" content="Credit card simulator app" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <UserButton afterSignOutUrl="/"></UserButton>
-      <div className="flex min-h-screen flex-col items-center justify-center bg-primary-foreground">
-        <p className="text-2xl text-foreground">
-          {hello.data ? hello.data.greeting : "Loading tRPC query..."}
-        </p>
-        <p className="text-2xl text-foreground">
-          Available Balance:{" "}
-          {balanceData?.availableBalance !== undefined
-            ? balanceData.availableBalance
-            : "Loading available balance..."}
-        </p>
-        <p className="text-2xl text-foreground">
-          Payable Balance:{" "}
-          {balanceData?.payableBalance !== undefined
-            ? balanceData.payableBalance
-            : "Loading payable balance..."}
-        </p>
-        <Button variant="outline" onClick={handleAuthorize}>
-          Authorize Transaction
-        </Button>
-        <Button variant="outline" onClick={handleCancel}>
-          Cancel Transaction
-        </Button>
-        <Button variant="outline" onClick={handleSettle}>
-          Settle Transaction
-        </Button>
-        <div>
-          Transactions Data:{" "}
-          {transactionsData !== undefined ? (
-            <pre>{JSON.stringify(transactionsData)}</pre>
-          ) : (
-            "Loading available balance..."
-          )}
+      <div className="flex min-h-screen flex-col bg-gray-100">
+        <NavBar></NavBar>
+        <div className="flex flex-wrap justify-center gap-4 p-4">
+          <div className="flex-1">
+            <AvailableBalance />
+          </div>
+          <div className="flex-1">
+            <PayableBalance />
+          </div>
+        </div>
+        <div className="flex flex-wrap justify-center gap-4 p-4">
+          <div className="flex-1">
+            <PendingTransactions />
+          </div>
+          <div className="flex-1">
+            <SettledTransactions />
+          </div>
         </div>
       </div>
     </>
