@@ -32,7 +32,7 @@ export const getVerifiedBalance = async (
         },
       });
     }
-    if (payment && balance?.payableBalance)
+    if (payment && balance.payableBalance == 0)
       throw new Error("Cannot process payment: payable balance is zero");
   } catch (error) {
     // Throw expected errors from try block
