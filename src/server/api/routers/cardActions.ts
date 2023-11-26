@@ -28,6 +28,7 @@ export const cardActionsRouter = createTRPCRouter({
 
   // Authorizes transaction and updates pending transactions and available credit
   // Returns updated pending transactions and availableCredit
+  // TODO: refactor route into a transaction so that previous updates are cancelled in case a later step is invalid
   authorizeTransaction: protectedProcedure
     .input(InitiateTransactionInput)
     .mutation(async ({ ctx, input }) => {
@@ -42,7 +43,7 @@ export const cardActionsRouter = createTRPCRouter({
         userId,
         TransactionType.PURCHASE,
         input.amount,
-        input.name,
+        input.name === "" ? "Untitled Transaction" : input.name,
       );
 
       // Get updated pending transactions
@@ -89,6 +90,7 @@ export const cardActionsRouter = createTRPCRouter({
       };
     }),
   // Note: payments are displayed as negative values, thus stored as negative numbers
+  // TODO: refactor route into a transaction so that previous updates are cancelled in case a later step is invalid
   initiatePayment: protectedProcedure
     .input(InitiateTransactionInput)
     .mutation(async ({ ctx, input }) => {
@@ -103,7 +105,7 @@ export const cardActionsRouter = createTRPCRouter({
         userId,
         TransactionType.PAYMENT,
         -input.amount,
-        input.name,
+        input.name === "" ? "Untitled Transaction" : input.name,
       );
 
       // Get updated pending transactions
