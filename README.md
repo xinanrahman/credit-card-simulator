@@ -23,7 +23,7 @@ pnpm install
 ```
 
 ### 4. Environment Variables
-You should receive the necessary environment variables in a .env via email. Once received, place the .env file at the root of the project directory.
+You should receive the necessary environment variables in a .env.example file via email. Once received, rename the file to .env after placing it at the root of the project directory.
 
 
 ### 5. Set Up Prisma
