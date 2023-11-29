@@ -12,6 +12,7 @@ import {
   ModalFooter,
   useDisclosure,
   Input,
+  Skeleton,
 } from "@nextui-org/react";
 import { api } from "~/utils/api";
 import { Button } from "@nextui-org/react";
@@ -36,7 +37,7 @@ const AvailableBalance = () => {
 
   // TODO: Refactor to return skeleton loading component
   if (!balanceData) {
-    return "Loading...";
+    return <Skeleton></Skeleton>;
   }
 
   // Handles resetting states when modal state changes

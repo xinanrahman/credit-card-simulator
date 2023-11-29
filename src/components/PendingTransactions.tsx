@@ -100,7 +100,6 @@ const PendingTransactions = () => {
       if (type == TransactionType.PURCHASE)
         await settleTransaction({ id: txnId, finalAmount: amount });
       else await postPayment({ id: txnId });
-      alert("Successfully settled transaction!");
       handleConfetti();
     } catch (error) {
       if (error instanceof Error) {
