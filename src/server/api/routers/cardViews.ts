@@ -1,7 +1,7 @@
 import { TransactionStatus, type Balance } from "@prisma/client";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getVerifiedBalance } from "~/server/utils";
+import { getVerifiedBalance, sortDescendingByDate } from "~/server/utils";
 import type {
   ClientPendingTransaction,
   ClientSettledTransaction,
@@ -59,11 +59,12 @@ export const cardViewsRouter = createTRPCRouter({
         createdAt: t.createdAt,
         status: t.status,
         type: t.type,
-      }));
+      }))
+      .sort(sortDescendingByDate);
 
-    const settledTransactions: ClientSettledTransaction[] = transactions.filter(
-      (t) => t.status == TransactionStatus.SETTLED,
-    );
+    const settledTransactions: ClientSettledTransaction[] = transactions
+      .filter((t) => t.status == TransactionStatus.SETTLED)
+      .sort(sortDescendingByDate);
 
     return { pendingTransactions, settledTransactions };
   }),
