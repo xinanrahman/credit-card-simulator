@@ -1,5 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
   provider     = "mysql"
@@ -7,36 +8,33 @@ datasource db {
   relationMode = "prisma"
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 model Balance {
-    id String @id
-    availableBalance Float @default(1000.0)
-    payableBalance Float @default(0.0)
-    transactions Transaction[] 
+  id               String        @id
+  availableBalance Float         @default(1000)
+  payableBalance   Float         @default(0)
+  transactions     Transaction[]
 }
-model Transaction {
-    id Int @id @default(autoincrement())
-    userId String
-    name String @default("Untitled Transaction")
-    amount Float 
-    createdAt DateTime @default(now())
-    settledAt DateTime? 
-    status TransactionStatus @default(PENDING)
-    type TransactionType
 
-    balance Balance @relation(fields: [userId], references: [id])
-    @@index([userId])
+model Transaction {
+  id        Int               @id @default(autoincrement())
+  userId    String
+  name      String            @default("Untitled Transaction")
+  createdAt DateTime          @default(now())
+  settledAt DateTime?
+  status    TransactionStatus @default(PENDING)
+  type      TransactionType
+  amount    Float
+  balance   Balance           @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 enum TransactionStatus {
-    PENDING
-    SETTLED
+  PENDING
+  SETTLED
 }
 
 enum TransactionType {
-    PAYMENT
-    PURCHASE
+  PAYMENT
+  PURCHASE
 }

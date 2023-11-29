@@ -119,8 +119,13 @@ export const updateSettledTransaction = async (
   let settled: Pick<Transaction, "amount">;
   try {
     // Include final amount if passed in (for transaction settlements)
-    const updateData: { status: TransactionStatus; amount?: number } = {
+    const updateData: {
+      status: TransactionStatus;
+      amount?: number;
+      settledAt: Date;
+    } = {
       status: TransactionStatus.SETTLED,
+      settledAt: new Date(),
     };
     if (finalAmount) {
       updateData.amount = finalAmount;

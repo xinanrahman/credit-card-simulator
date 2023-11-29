@@ -15,6 +15,7 @@ import {
 } from "@nextui-org/react";
 import { api } from "~/utils/api";
 import { Button } from "@nextui-org/react";
+import { handleConfetti } from "~/utils/helpers";
 
 const PayableBalance = () => {
   const { data: balanceData } = api.cardViews.getBalances.useQuery();
@@ -25,21 +26,35 @@ const PayableBalance = () => {
     api.cardActions.initiatePayment.useMutation({
       onSuccess: () => {
         void ctx.cardViews.getBalances.invalidate();
+        void ctx.cardViews.getTransactions.invalidate();
       },
     });
 
   const [payment, setPayment] = useState<string>("");
   const [name, setName] = useState<string>("");
+  const [submitLoading, setSubmitLoading] = useState<boolean>(false);
+  const [invalid, setInvalid] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>("");
 
   // TODO: Refactor to return skeleton loading component
   if (!balanceData) {
     return "Loading...";
   }
 
+  const handleOpenChange = (onOpenChange: () => void): void => {
+    setPayment("");
+    setName("");
+    setInvalid(false);
+    setErrorMsg("");
+    onOpenChange();
+  };
+
   // Handles closing the modal and resetting states
   const handleClose = (onClose: () => void): void => {
     setPayment("");
     setName("");
+    setInvalid(false);
+    setErrorMsg("");
     onClose();
   };
 
@@ -52,22 +67,25 @@ const PayableBalance = () => {
       parsedPayment <= 0 ||
       parsedPayment > balanceData.payableBalance
     ) {
-      alert(
-        `Invalid payment amount! Please enter a valid number greater than 0 and less than ${balanceData.payableBalance}`,
+      setInvalid(true);
+      setErrorMsg(
+        `Please enter a valid number greater than 0 and less than ${balanceData.payableBalance}`,
       );
       return;
     }
     try {
-      const res = await initiatePayment({ amount: parsedPayment, name: name });
-      alert(
-        `Payment initiated successfully! Your payable balance has been updated immediately to $${res.payableBalance}`,
-      );
+      setSubmitLoading(true);
+      await initiatePayment({ amount: parsedPayment, name: name });
+      setSubmitLoading(false);
+      handleConfetti();
       handleClose(onClose);
     } catch (error) {
+      setSubmitLoading(false);
+      setInvalid(true);
       if (error instanceof Error) {
-        alert(`Initiating payment failed: ${error.message}`);
+        setErrorMsg(`Initiating payment failed: ${error.message}`);
       } else {
-        alert(`Initiating payment failed due to an unknown error`);
+        setErrorMsg(`Initiating payment failed due to an unknown error`);
       }
     }
   };
@@ -96,7 +114,11 @@ const PayableBalance = () => {
           </Button>
         </CardFooter>
       </Card>
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} placement="top-center">
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={() => handleOpenChange(onOpenChange)}
+        placement="top-center"
+      >
         <ModalContent>
           {(onClose) => (
             <>
@@ -111,6 +133,8 @@ const PayableBalance = () => {
                   onChange={(e) => setPayment(e.currentTarget.value)}
                   variant="bordered"
                   isRequired={true}
+                  isInvalid={invalid}
+                  errorMessage={errorMsg}
                   startContent={
                     <div className="pointer-events-none flex items-center">
                       <span className="text-small text-default-400">$</span>
@@ -132,7 +156,11 @@ const PayableBalance = () => {
                 >
                   Cancel
                 </Button>
-                <Button color="primary" onPress={() => handlePayment(onClose)}>
+                <Button
+                  color="primary"
+                  onPress={() => handlePayment(onClose)}
+                  isLoading={submitLoading}
+                >
                   Submit
                 </Button>
               </ModalFooter>

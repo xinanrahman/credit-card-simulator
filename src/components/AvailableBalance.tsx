@@ -5,7 +5,6 @@ import {
   CardBody,
   CardFooter,
   Divider,
-  Link,
   Modal,
   ModalContent,
   ModalHeader,
@@ -16,6 +15,7 @@ import {
 } from "@nextui-org/react";
 import { api } from "~/utils/api";
 import { Button } from "@nextui-org/react";
+import { handleConfetti } from "~/utils/helpers";
 
 const AvailableBalance = () => {
   const { data: balanceData } = api.cardViews.getBalances.useQuery();
@@ -25,21 +25,35 @@ const AvailableBalance = () => {
     api.cardActions.authorizeTransaction.useMutation({
       onSuccess: () => {
         void ctx.cardViews.getBalances.invalidate();
+        void ctx.cardViews.getTransactions.invalidate();
       },
     });
-
   const [amountVal, setAmountVal] = useState<string>("");
   const [name, setName] = useState<string>("");
+  const [submitLoading, setSubmitLoading] = useState<boolean>(false);
+  const [invalid, setInvalid] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>("");
 
   // TODO: Refactor to return skeleton loading component
   if (!balanceData) {
     return "Loading...";
   }
 
+  // Handles resetting states when modal state changes
+  const handleOpenChange = (onOpenChange: () => void): void => {
+    setAmountVal("");
+    setName("");
+    setInvalid(false);
+    setErrorMsg("");
+    onOpenChange();
+  };
+
   // Handles closing the modal and resetting states
   const handleClose = (onClose: () => void): void => {
     setAmountVal("");
     setName("");
+    setInvalid(false);
+    setErrorMsg("");
     onClose();
   };
 
@@ -48,22 +62,26 @@ const AvailableBalance = () => {
   const handleAuthTransaction = async (onClose: () => void): Promise<void> => {
     const parsedAmount: number = parseFloat(amountVal);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      alert(
-        "Invalid transaction amount! Please enter a valid number greater than 0",
-      );
+      setInvalid(true);
+      setErrorMsg("Please enter a valid number greater than 0!");
+      // alert(
+      //   "Invalid transaction amount! Please enter a valid number greater than 0",
+      // );
       return;
     }
     try {
-      const res = await authTransaction({ amount: parsedAmount, name: name });
-      alert(
-        `Transaction authorized successfully! Your new available balance is: $${res.availableBalance}`,
-      );
+      setSubmitLoading(true);
+      await authTransaction({ amount: parsedAmount, name: name });
+      setSubmitLoading(false);
+      handleConfetti();
       handleClose(onClose);
     } catch (error) {
+      setSubmitLoading(false);
+      setInvalid(true);
       if (error instanceof Error) {
-        alert(`Transaction authorization failed: ${error.message}`);
+        setErrorMsg(`Transaction authorization failed: ${error.message}`);
       } else {
-        alert(`Transaction authorization failed due to an unknown error`);
+        setErrorMsg(`Transaction authorization failed due to an unknown error`);
       }
     }
   };
@@ -94,7 +112,11 @@ const AvailableBalance = () => {
           </Button>
         </CardFooter>
       </Card>
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} placement="top-center">
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={() => handleOpenChange(onOpenChange)}
+        placement="top-center"
+      >
         <ModalContent>
           {(onClose) => (
             <>
@@ -109,6 +131,8 @@ const AvailableBalance = () => {
                   onChange={(e) => setAmountVal(e.currentTarget.value)}
                   variant="bordered"
                   isRequired={true}
+                  isInvalid={invalid}
+                  errorMessage={errorMsg}
                   startContent={
                     <div className="pointer-events-none flex items-center">
                       <span className="text-small text-default-400">$</span>
@@ -133,6 +157,7 @@ const AvailableBalance = () => {
                 <Button
                   color="primary"
                   onPress={() => handleAuthTransaction(onClose)}
+                  isLoading={submitLoading}
                 >
                   Submit
                 </Button>
