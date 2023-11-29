@@ -1,11 +1,12 @@
-import {
-  TransactionStatus,
-  type Balance,
-  type Transaction,
-} from "@prisma/client";
+import { TransactionStatus, type Balance } from "@prisma/client";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getVerifiedBalance } from "~/server/utils";
+import type {
+  ClientPendingTransaction,
+  ClientSettledTransaction,
+  RelevantTransactionData,
+} from "~/utils/types";
 
 export const cardViewsRouter = createTRPCRouter({
   getBalances: protectedProcedure.query(async ({ ctx }) => {
@@ -27,12 +28,21 @@ export const cardViewsRouter = createTRPCRouter({
       throw new Error("User is not authenticated");
     }
 
-    // Get all transactions
-    let transactions: Transaction[] | null;
+    // Get relevent transaction data
+    let transactions: RelevantTransactionData[];
     try {
       transactions = await ctx.db.transaction.findMany({
         where: {
           userId: userId,
+        },
+        select: {
+          id: true,
+          amount: true,
+          name: true,
+          createdAt: true,
+          settledAt: true,
+          status: true,
+          type: true,
         },
       });
     } catch (error) {
@@ -40,10 +50,18 @@ export const cardViewsRouter = createTRPCRouter({
     }
 
     // Filter transactions by pending and settled
-    const pendingTransactions = transactions.filter(
-      (t) => t.status == TransactionStatus.PENDING,
-    );
-    const settledTransactions = transactions.filter(
+    const pendingTransactions: ClientPendingTransaction[] = transactions
+      .filter((t) => t.status == TransactionStatus.PENDING)
+      .map((t) => ({
+        id: t.id,
+        amount: t.amount,
+        name: t.name,
+        createdAt: t.createdAt,
+        status: t.status,
+        type: t.type,
+      }));
+
+    const settledTransactions: ClientSettledTransaction[] = transactions.filter(
       (t) => t.status == TransactionStatus.SETTLED,
     );
 

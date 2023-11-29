@@ -18,14 +18,6 @@ import {
 } from "~/server/utils";
 
 export const cardActionsRouter = createTRPCRouter({
-  hello: protectedProcedure
-    .input(z.object({ text: z.string() }))
-    .query(({ ctx, input }) => {
-      return {
-        greeting: `Hello ${input.text}, ${ctx.auth?.userId}`,
-      };
-    }),
-
   // Authorizes transaction and updates pending transactions and available credit
   // Returns updated pending transactions and availableCredit
   // TODO: refactor route into a transaction so that previous updates are cancelled in case a later step is invalid
@@ -36,19 +28,6 @@ export const cardActionsRouter = createTRPCRouter({
       if (!userId) {
         throw new Error("User is not authenticated");
       }
-
-      // Create pending transaction
-      // Note: keep below structure in case we want to return transaction in the future
-      const transaction: Transaction = await createTransaction(
-        userId,
-        TransactionType.PURCHASE,
-        input.amount,
-        input.name === "" ? "Untitled Transaction" : input.name,
-      );
-
-      // Get updated pending transactions
-      const updatedPendingTransactions: Transaction[] =
-        await getPendingTransactions(userId);
 
       // Get verified balance; create balance if it does not exist
       let balance: Balance;
@@ -66,6 +45,19 @@ export const cardActionsRouter = createTRPCRouter({
           throw new Error("Error retrieving verified balance");
         }
       }
+
+      // Create pending transaction
+      // Note: keep below structure in case we want to return transaction in the future
+      const transaction: Transaction = await createTransaction(
+        userId,
+        TransactionType.PURCHASE,
+        input.amount,
+        input.name === "" ? "Untitled Transaction" : input.name,
+      );
+
+      // Get updated pending transactions
+      const updatedPendingTransactions: Transaction[] =
+        await getPendingTransactions(userId);
 
       // Decrement available balance by transaction amount
       let updatedBalance: Balance;
@@ -99,19 +91,6 @@ export const cardActionsRouter = createTRPCRouter({
         throw new Error("User is not authenticated");
       }
 
-      // Create pending transaction
-      // Note: keep below structure in case we want to return transaction in the future
-      const transaction: Transaction = await createTransaction(
-        userId,
-        TransactionType.PAYMENT,
-        -input.amount,
-        input.name === "" ? "Untitled Transaction" : input.name,
-      );
-
-      // Get updated pending transactions
-      const updatedPendingTransactions: Transaction[] =
-        await getPendingTransactions(userId);
-
       // Get verified payable balance and handle invalid inputs
       let balance: Balance;
       const payment = true;
@@ -131,6 +110,19 @@ export const cardActionsRouter = createTRPCRouter({
           );
         }
       }
+
+      // Create pending transaction
+      // Note: keep below structure in case we want to return transaction in the future
+      const transaction: Transaction = await createTransaction(
+        userId,
+        TransactionType.PAYMENT,
+        -input.amount,
+        input.name === "" ? "Untitled Transaction" : input.name,
+      );
+
+      // Get updated pending transactions
+      const updatedPendingTransactions: Transaction[] =
+        await getPendingTransactions(userId);
 
       // Decrement payable balance
       let updatedBalance: Balance;
