@@ -12,6 +12,7 @@ import {
   ModalFooter,
   useDisclosure,
   Input,
+  Skeleton,
 } from "@nextui-org/react";
 import { api } from "~/utils/api";
 import { Button } from "@nextui-org/react";
@@ -38,7 +39,7 @@ const PayableBalance = () => {
 
   // TODO: Refactor to return skeleton loading component
   if (!balanceData) {
-    return "Loading...";
+    return <Skeleton></Skeleton>;
   }
 
   const handleOpenChange = (onOpenChange: () => void): void => {
@@ -150,14 +151,13 @@ const PayableBalance = () => {
               </ModalBody>
               <ModalFooter>
                 <Button
-                  color="danger"
-                  variant="flat"
+                  className="bg-gradient-to-tr from-red-500 to-pink-500 text-white shadow-lg"
                   onPress={() => handleClose(onClose)}
                 >
                   Cancel
                 </Button>
                 <Button
-                  color="primary"
+                  className="bg-gradient-to-tr from-green-400 to-green-500 text-white shadow-lg"
                   onPress={() => handlePayment(onClose)}
                   isLoading={submitLoading}
                 >

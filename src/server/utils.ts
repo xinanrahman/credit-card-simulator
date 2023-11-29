@@ -5,6 +5,10 @@ import {
   type TransactionType,
 } from "@prisma/client";
 import { db } from "./db";
+import {
+  ClientPendingTransaction,
+  ClientSettledTransaction,
+} from "~/utils/types";
 
 // Utility function to get the balance for a user
 // Creates a balance if it doesn't exist and a payment is not being attempted
@@ -167,3 +171,12 @@ export class ExcessPaymentError extends Error {
     this.name = "ExcessPaymentError";
   }
 }
+
+export const sortDescendingByDate = (
+  a: ClientPendingTransaction | ClientSettledTransaction,
+  b: ClientPendingTransaction | ClientSettledTransaction,
+): number => {
+  const dateA = new Date(a.createdAt);
+  const dateB = new Date(b.createdAt);
+  return dateB.getTime() - dateA.getTime();
+};

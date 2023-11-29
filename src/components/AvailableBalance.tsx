@@ -12,6 +12,7 @@ import {
   ModalFooter,
   useDisclosure,
   Input,
+  Skeleton,
 } from "@nextui-org/react";
 import { api } from "~/utils/api";
 import { Button } from "@nextui-org/react";
@@ -36,7 +37,7 @@ const AvailableBalance = () => {
 
   // TODO: Refactor to return skeleton loading component
   if (!balanceData) {
-    return "Loading...";
+    return <Skeleton></Skeleton>;
   }
 
   // Handles resetting states when modal state changes
@@ -148,14 +149,13 @@ const AvailableBalance = () => {
               </ModalBody>
               <ModalFooter>
                 <Button
-                  color="danger"
-                  variant="flat"
+                  className="bg-gradient-to-tr from-red-500 to-pink-500 text-white shadow-lg"
                   onPress={() => handleClose(onClose)}
                 >
                   Cancel
                 </Button>
                 <Button
-                  color="primary"
+                  className="bg-gradient-to-tr from-green-400 to-green-500 text-white shadow-lg"
                   onPress={() => handleAuthTransaction(onClose)}
                   isLoading={submitLoading}
                 >

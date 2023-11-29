@@ -27,6 +27,7 @@ import type { Key, ReactNode } from "react";
 import { api } from "~/utils/api";
 import { ChevronDownIcon } from "./icons/ChevronDownIcon";
 import type { ClientSettledTransaction } from "~/utils/types";
+import { TransactionType } from "@prisma/client";
 
 const SettledTransactions = () => {
   // Retrieve pending transactions to populate table
@@ -96,7 +97,11 @@ const SettledTransactions = () => {
           return (
             // need to support other currencies though :(
             <div className="flex flex-col">
-              <p className="text-bold text-small capitalize">${displayVal}</p>
+              <p className="text-bold text-small capitalize">
+                {txn.type === TransactionType.PAYMENT
+                  ? "-$" + Math.abs(txn.amount)
+                  : "$" + txn.amount}
+              </p>
             </div>
           );
         case "name":
@@ -317,7 +322,7 @@ const SettledTransactions = () => {
           </TableColumn>
         )}
       </TableHeader>
-      <TableBody emptyContent={"No pending transactions found"} items={items}>
+      <TableBody emptyContent={"No settled transactions found"} items={items}>
         {(item) => (
           <TableRow key={item.createdAt.toISOString()}>
             {(columnKey) => (

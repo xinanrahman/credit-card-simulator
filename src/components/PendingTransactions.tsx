@@ -14,17 +14,16 @@ import {
   Chip,
   Pagination,
   Selection,
-  ChipProps,
 } from "@nextui-org/react";
-import { VerticalDotsIcon } from "./icons/VerticalDotsIcon";
 import { SearchIcon } from "./icons/SearchIcon";
 import {
   INITIAL_VISIBLE_COLUMNS_PENDING,
   pendingColumns,
   typeOptions,
 } from "~/utils/data";
-import { capitalize } from "~/utils/helpers";
-import React, { Key, ReactNode, useMemo } from "react";
+import { capitalize, handleConfetti } from "~/utils/helpers";
+import React, { useMemo, useState } from "react";
+import type { Key, ReactNode } from "react";
 import { api } from "~/utils/api";
 import { ChevronDownIcon } from "./icons/ChevronDownIcon";
 import type { ClientPendingTransaction } from "~/utils/types";
@@ -67,12 +66,13 @@ const PendingTransactions = () => {
     },
   });
 
-  const [filterValue, setFilterValue] = React.useState("");
-  const [visibleColumns, setVisibleColumns] = React.useState<Selection>(
+  const [filterValue, setFilterValue] = useState("");
+  const [visibleColumns, setVisibleColumns] = useState<Selection>(
     new Set(INITIAL_VISIBLE_COLUMNS_PENDING),
   );
-  const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
-  const [rowsPerPage, setRowsPerPage] = React.useState(5);
+  const [statusFilter, setStatusFilter] = useState<Selection>("all");
+  const [rowsPerPage, setRowsPerPage] = useState<number>(5);
+
   const handleCancel = async (
     txnId: number,
     type: TransactionType,
@@ -81,7 +81,7 @@ const PendingTransactions = () => {
       if (type == TransactionType.PURCHASE)
         await clearTransaction({ id: txnId });
       else await cancelPayment({ id: txnId });
-      alert("Successfully cancelled transaction!");
+      handleConfetti();
     } catch (error) {
       if (error instanceof Error) {
         alert(`Transaction cancellation failed! ${error.message}`);
@@ -100,7 +100,7 @@ const PendingTransactions = () => {
       if (type == TransactionType.PURCHASE)
         await settleTransaction({ id: txnId, finalAmount: amount });
       else await postPayment({ id: txnId });
-      alert("Successfully settled transaction!");
+      handleConfetti();
     } catch (error) {
       if (error instanceof Error) {
         alert(`Transaction settlement failed! ${error.message}`);
@@ -110,7 +110,7 @@ const PendingTransactions = () => {
     }
   };
 
-  const [page, setPage] = React.useState(1);
+  const [page, setPage] = useState(1);
 
   const hasSearchFilter = Boolean(filterValue);
 
@@ -167,7 +167,11 @@ const PendingTransactions = () => {
           return (
             // need to support other currencies though :(
             <div className="flex flex-col">
-              <p className="text-bold text-small capitalize">${displayVal}</p>
+              <p className="text-bold text-small capitalize">
+                {txn.type === TransactionType.PAYMENT
+                  ? "-$" + Math.abs(txn.amount)
+                  : "$" + txn.amount}
+              </p>
             </div>
           );
         case "name":
@@ -196,23 +200,24 @@ const PendingTransactions = () => {
         case "actions":
           return (
             <div className="relative flex items-center justify-end gap-2">
-              <Dropdown>
-                <DropdownTrigger>
-                  <Button isIconOnly size="sm" variant="light">
-                    <VerticalDotsIcon className="text-default-300" />
-                  </Button>
-                </DropdownTrigger>
-                <DropdownMenu>
-                  <DropdownItem onPress={() => handleCancel(txn.id, txn.type)}>
-                    Cancel
-                  </DropdownItem>
-                  <DropdownItem
-                    onPress={() => handleSettle(txn.id, txn.amount, txn.type)}
-                  >
-                    Settle
-                  </DropdownItem>
-                </DropdownMenu>
-              </Dropdown>
+              <div className="relative flex justify-center gap-2">
+                <Button
+                  size="sm"
+                  onPress={() => handleSettle(txn.id, txn.amount, txn.type)}
+                  radius="full"
+                  className="bg-gradient-to-tr from-green-400 to-green-500 text-white shadow-lg"
+                >
+                  SETTLE
+                </Button>
+                <Button
+                  size="sm"
+                  onPress={() => handleCancel(txn.id, txn.type)}
+                  radius="full"
+                  className="bg-gradient-to-tr from-red-500 to-pink-500 text-white shadow-lg"
+                >
+                  CANCEL
+                </Button>
+              </div>
             </div>
           );
         default:
@@ -268,6 +273,7 @@ const PendingTransactions = () => {
             value={filterValue}
             onClear={() => onClear()}
             onValueChange={onSearchChange}
+            variant="flat"
           />
           <div className="flex gap-3">
             <Dropdown>
@@ -383,37 +389,39 @@ const PendingTransactions = () => {
   }, [items.length, page, pages, hasSearchFilter]);
 
   return (
-    <Table
-      aria-label="Example table with custom cells, pagination and sorting"
-      isHeaderSticky
-      bottomContent={bottomContent}
-      bottomContentPlacement="outside"
-      classNames={{
-        wrapper: "max-h-[382px]",
-      }}
-      topContent={topContent}
-      topContentPlacement="outside"
-    >
-      <TableHeader columns={headerColumns}>
-        {(column) => (
-          <TableColumn
-            key={column.uid}
-            align={column.uid === "actions" ? "center" : "start"}
-          >
-            {column.name}
-          </TableColumn>
-        )}
-      </TableHeader>
-      <TableBody emptyContent={"No pending transactions found"} items={items}>
-        {(item) => (
-          <TableRow key={item.createdAt.toISOString()}>
-            {(columnKey) => (
-              <TableCell>{renderCell(item, columnKey)}</TableCell>
-            )}
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
+    <>
+      <Table
+        aria-label="Example table with custom cells, pagination and sorting"
+        isHeaderSticky
+        bottomContent={bottomContent}
+        bottomContentPlacement="outside"
+        classNames={{
+          wrapper: "max-h-[382px]",
+        }}
+        topContent={topContent}
+        topContentPlacement="outside"
+      >
+        <TableHeader columns={headerColumns}>
+          {(column) => (
+            <TableColumn
+              key={column.uid}
+              align={column.uid === "actions" ? "center" : "start"}
+            >
+              {column.name}
+            </TableColumn>
+          )}
+        </TableHeader>
+        <TableBody emptyContent={"No pending transactions found"} items={items}>
+          {(item) => (
+            <TableRow key={item.createdAt.toISOString()}>
+              {(columnKey) => (
+                <TableCell>{renderCell(item, columnKey)}</TableCell>
+              )}
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </>
   );
 };
 
