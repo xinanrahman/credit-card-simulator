@@ -1,28 +1,46 @@
-# Create T3 App
+## Getting Started
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+### 1. Install `pnpm`
 
-## What's next? How do I make an app with this?
+If you do not have `pnpm` installed, you can install it globally using npm (or brew):
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+```bash
+npm install -g pnpm
+```
+### 2. Clone the Repository
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+Clone the repo:
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+```bash
+git clone https://github.com/xinanrahman/credit-card-simulator.git
+cd credit-card-simulator
+```
 
-## Learn More
+### 3. Install Dependencies
+Install the required dependencies using pnpm:
+```bash
+pnpm install
+```
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+### 4. Environment Variables
+You should receive the necessary environment variables in a .env via email. Once received, place the .env file at the root of the project directory.
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+### 5. Set Up Prisma
+Initialize Prisma to set up your database schema:
+```bash
+pnpm db:push
+```
+You can also use Prisma Studio to visually manipulate the local database:
+```bash
+pnpm db:studio
+```
 
-## How do I deploy this?
+### 6. Start the Development Server
+```bash
+pnpm dev
+```
+The application will be available at http://localhost:3000 or your default port for running apps locally.
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+
+
